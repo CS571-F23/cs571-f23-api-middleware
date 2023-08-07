@@ -1,8 +1,9 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
 import { CS571Auth } from './auth';
 import { CS571Util } from './util';
 import { rateLimit } from 'express-rate-limit';
+import { CS571Configurator } from './configure';
 
 export class CS571Initializer {
     static init(app: Express): void {
@@ -29,7 +30,7 @@ export class CS571Initializer {
     }
 
     private static initErrorHandling(app: Express): void {
-        app.use((err: Error, req: Request, res: Response) => {
+        app.use((err: Error, req: Request, res: Response, next: NextFunction): void => {
             console.log("Encountered an erroneous request!")
             const datetime = new Date();
             const datetimeStr = `${datetime.toLocaleDateString()} ${datetime.toLocaleTimeString()}`;
@@ -53,8 +54,8 @@ export class CS571Initializer {
             message: {
                 msg: "Too many requests, please try again later."
             },
-            windowMs: 30 * 1000, // 30 seconds
-            max: (req, _) => req.method === "OPTIONS" ? 0 : 100, // limit each client to 100 requests every 30 seconds
+            windowMs: CS571Configurator.getConfig().TIMEOUT_WINDOW_LENGTH * 1000,
+            max: (req, _) => req.method === "OPTIONS" ? 0 : CS571Configurator.getConfig().TIMEOUT_WINDOW_REQS,
             keyGenerator: (req, _) => req.header('X-CS571-ID') as string // throttle on BID
         }));
         app.set('trust proxy', 1);
@@ -72,6 +73,10 @@ export class CS571Initializer {
     }
 
     private static initAuth(app: Express): void {
-
+        app.use(function (req, res, next) {
+            if(CS571Auth.authenticate(req, res)) {
+                next();
+            }
+        });
     }
 }
