@@ -1,18 +1,28 @@
 import express, { Express, NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
+import dotenv from 'dotenv';
+
 import { CS571Auth } from './auth';
 import { CS571Util } from './util';
 import { rateLimit } from 'express-rate-limit';
 import { CS571Configurator } from './configure';
+import { CS571RouteHealth } from '../routes/health';
 
 export class CS571Initializer {
     static init(app: Express): void {
+        CS571Initializer.initEnvironmentVars(app);
         CS571Initializer.initLogging(app);
         CS571Initializer.initErrorHandling(app);
         CS571Initializer.initBodyParsing(app);
         CS571Initializer.initRateLimiting(app);
         CS571Initializer.initCorsPolicy(app);
         CS571Initializer.initAuth(app);
+        CS571Initializer.initHealth(app);
+        CS571Initializer.initNotFound(app);
+    }
+
+    private static initEnvironmentVars(app: Express): void {
+        dotenv.config();
     }
 
     private static initLogging(app: Express): void {
@@ -39,6 +49,14 @@ export class CS571Initializer {
                 "error-req": JSON.stringify(req.body),
                 "date-time": datetimeStr
             })
+        });
+
+        process.on('uncaughtException', function (exception) {
+            console.log(exception);
+        });
+          
+        process.on('unhandledRejection', (reason, p) => {
+            console.log("Unhandled Rejection at: Promise ", p, " reason: ", reason);
         });
     }
 
@@ -77,6 +95,18 @@ export class CS571Initializer {
             if(CS571Auth.authenticate(req, res)) {
                 next();
             }
+        });
+    }
+
+    private static initHealth(app: Express): void {
+        new CS571RouteHealth().addRoute(app);
+    }
+
+    private static initNotFound(app: Express): void {
+        app.use((req, res, next) => {
+            res.status(404).send({
+                msg: "That API route does not exist!"
+            });
         });
     }
 }
