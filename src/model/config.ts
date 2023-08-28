@@ -1,29 +1,34 @@
 import fs from "fs";
 
-export class CS571Config {
+export class CS571Config<T, K> {
+    
+    public static readonly DEFAULT_PUBLIC_CONFIG_PATH: string = 'config.public';
+    public static readonly DEFAULT_PRIVATE_CONFIG_PATH: string = 'config.secret';
+
+    public readonly PRODUCT: string;
     public readonly ENV_NAME: string;
     public readonly PORT: number;
-    public readonly SESSION_LENGTH: number;
-    public readonly SESSION_SECRET: string;
-    public readonly TIMEOUT_WINDOW_LENGTH: number;
-    public readonly TIMEOUT_WINDOW_REQS: number;
-    public readonly AUTH_URL: string;
 
+    public readonly PUBLIC_CONFIG: T;
+    public readonly SECRET_CONFIG: K;
 
-    private constructor(secretPath: string) {
-        this.ENV_NAME = process.env["ENV_NAME"] ?? "unknown";
+    private constructor(publicPath: string, secretPath: string) {
+        this.PRODUCT = process.env["PRODUCT"] ?? "unknown";
+        this.ENV_NAME = process.env["ENV_NAME"] ?? "dev";
         this.PORT = parseInt(process.env["PORT"] ?? "37190");
-        this.SESSION_LENGTH = parseInt(process.env["SESSION_LENGTH"] ?? "3600");
-        this.TIMEOUT_WINDOW_LENGTH = parseInt(process.env["TIMEOUT_WINDOW_LENGTH"] ?? "30");
-        this.TIMEOUT_WINDOW_REQS = parseInt(process.env["TIMEOUT_WINDOW_REQS"] ?? "100");
-        this.AUTH_URL = process.env["AUTH_URL"] ?? "https://cs571.org/";
-
-
-        const secretConfig = JSON.parse(fs.readFileSync(secretPath).toString());
-        this.SESSION_SECRET = secretConfig["SESSION_SECRET"]
+        
+        this.PUBLIC_CONFIG = JSON.parse(fs.readFileSync(publicPath).toString())
+        this.SECRET_CONFIG = JSON.parse(fs.readFileSync(secretPath).toString());
     }
 
-    public static construct(secretPath: string): CS571Config {
-        return new CS571Config(secretPath);
+    public static construct<F, E>(): CS571Config<F, E> {
+        return CS571Config.constructFromPaths(
+            process.env["CS571_PUBLIC_CONFIG_PATH"] ?? CS571Config.DEFAULT_PUBLIC_CONFIG_PATH,
+            process.env["CS571_PRIVATE_CONFIG_PATH"] ?? CS571Config.DEFAULT_PRIVATE_CONFIG_PATH
+        );
+    }
+
+    public static constructFromPaths<F, E>(pubPath: string, privPath: string): CS571Config<F, E> {
+        return new CS571Config<F, E>(pubPath, privPath);
     }
 }

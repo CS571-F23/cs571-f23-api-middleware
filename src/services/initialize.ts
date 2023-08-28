@@ -5,20 +5,36 @@ import dotenv from 'dotenv';
 import { CS571Auth } from './auth';
 import { CS571Util } from './util';
 import { rateLimit } from 'express-rate-limit';
-import { CS571Configurator } from './configure';
 import { CS571RouteHealth } from '../routes/health';
+import { CS571App } from '../model/app';
+import { CS571Router } from '../model/router';
+import { CS571DefaultPublicConfig, CS571DefaultSecretConfig } from '../interfaces';
+import { CS571Config, CS571InitOptions } from '../model';
 
 export class CS571Initializer {
-    static init(app: Express): void {
+    static init<
+        T extends CS571DefaultPublicConfig,
+        K extends CS571DefaultSecretConfig
+    >(app: Express, options?: CS571InitOptions): CS571App<T, K> {
         CS571Initializer.initEnvironmentVars(app);
         CS571Initializer.initLogging(app);
         CS571Initializer.initErrorHandling(app);
         CS571Initializer.initBodyParsing(app);
-        CS571Initializer.initRateLimiting(app);
+
+        const router = CS571Router.construct(app);
+        const config = CS571Config.construct<T, K>();
+        const appBundle = CS571App.construct<T, K>(router, config);
+
+        CS571Initializer.initRateLimiting<T>(app, config.PUBLIC_CONFIG);
         CS571Initializer.initCorsPolicy(app);
-        CS571Initializer.initAuth(app);
-        CS571Initializer.initHealth(app);
-        CS571Initializer.initNotFound(app);
+        CS571Initializer.initAuth(app, options?.allowNoAuth);
+        CS571Initializer.initHealth(router);
+
+        if(!options?.allowNoAuth) {
+            router.finalize();
+        }
+
+        return appBundle;
     }
 
     private static initEnvironmentVars(app: Express): void {
@@ -67,13 +83,13 @@ export class CS571Initializer {
         }));
     }
 
-    private static initRateLimiting(app: Express): void {
+    private static initRateLimiting<T extends CS571DefaultPublicConfig>(app: Express, config: T): void {
         app.use(rateLimit({
             message: {
                 msg: "Too many requests, please try again later."
             },
-            windowMs: CS571Configurator.getConfig().TIMEOUT_WINDOW_LENGTH * 1000,
-            max: (req, _) => req.method === "OPTIONS" ? 0 : CS571Configurator.getConfig().TIMEOUT_WINDOW_REQS,
+            windowMs: config.TIMEOUT_WINDOW_LENGTH * 1000,
+            max: (req, _) => req.method === "OPTIONS" ? 0 : config.TIMEOUT_WINDOW_REQS,
             keyGenerator: (req, _) => req.header('X-CS571-ID') as string // throttle on BID
         }));
         app.set('trust proxy', 1);
@@ -86,27 +102,20 @@ export class CS571Initializer {
             res.header('Access-Control-Allow-Methods', req.headers["access-control-request-method"]);
             res.header('Access-Control-Allow-Credentials', 'true');
             res.header('Access-Control-Expose-Headers', 'Set-Cookie');
+            res.header('Vary', 'Origin, Access-Control-Allow-Headers, Access-Control-Allow-Methods')
             next();
         });
     }
 
-    private static initAuth(app: Express): void {
+    private static initAuth(app: Express, noAuthRoutes: string[] | undefined): void {
         app.use(function (req, res, next) {
-            if(CS571Auth.authenticate(req, res)) {
+            if((noAuthRoutes && noAuthRoutes.includes(req.originalUrl)) || CS571Auth.authenticate(req, res)) {
                 next();
             }
         });
     }
 
-    private static initHealth(app: Express): void {
-        new CS571RouteHealth().addRoute(app);
-    }
-
-    private static initNotFound(app: Express): void {
-        app.use((req, res, next) => {
-            res.status(404).send({
-                msg: "That API route does not exist!"
-            });
-        });
+    private static initHealth(router: CS571Router): void {
+        router.addRoute(new CS571RouteHealth());
     }
 }
