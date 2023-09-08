@@ -1,6 +1,7 @@
 import fs from "fs";
+import { CS571DefaultPublicConfig, CS571DefaultSecretConfig } from "../interfaces";
 
-export class CS571Config<T, K> {
+export class CS571Config<T = CS571DefaultPublicConfig, K = CS571DefaultSecretConfig> {
     
     public static readonly DEFAULT_PUBLIC_CONFIG_PATH: string = 'config.public';
     public static readonly DEFAULT_PRIVATE_CONFIG_PATH: string = 'config.secret';
@@ -28,7 +29,7 @@ export class CS571Config<T, K> {
         );
     }
 
-    public static constructFromPaths<F, E>(pubPath: string, privPath: string): CS571Config<F, E> {
+    public static constructFromPaths<F = CS571DefaultPublicConfig, E = CS571DefaultSecretConfig>(pubPath: string, privPath: string): CS571Config<F, E> {
         return new CS571Config<F, E>(pubPath, privPath);
     }
 }

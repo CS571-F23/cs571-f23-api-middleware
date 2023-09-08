@@ -17,23 +17,26 @@ export class CS571Initializer {
         K extends CS571DefaultSecretConfig
     >(app: Express, options?: CS571InitOptions): CS571App<T, K> {
         CS571Initializer.initEnvironmentVars(app);
-        CS571Initializer.initLogging(app);
-        CS571Initializer.initErrorHandling(app);
-        CS571Initializer.initBodyParsing(app);
 
         const router = CS571Router.construct(app);
         const config = CS571Config.construct<T, K>();
-        const appBundle = CS571App.construct<T, K>(router, config);
-
+        const auth = CS571Auth.construct(config);
+        
+        CS571Initializer.initLogging(app, auth);
+        CS571Initializer.initErrorHandling(app);
+        CS571Initializer.initBodyParsing(app);
         CS571Initializer.initRateLimiting<T>(app, config.PUBLIC_CONFIG);
         CS571Initializer.initCorsPolicy(app);
-        CS571Initializer.initAuth(app, options?.allowNoAuth);
+        if(options?.skipAuth === false) {
+            CS571Initializer.initAuth(app, auth, options?.allowNoAuth);
+        }
         CS571Initializer.initHealth(router);
 
         if(!options?.allowNoAuth) {
             router.finalize();
         }
 
+        const appBundle = CS571App.construct<T, K>(router, config, auth);
         return appBundle;
     }
 
@@ -41,7 +44,7 @@ export class CS571Initializer {
         dotenv.config();
     }
 
-    private static initLogging(app: Express): void {
+    private static initLogging(app: Express, auth: CS571Auth): void {
         app.use(morgan((tokens, req, res) => {
             return [
                 CS571Util.getDateForLogging(),
@@ -49,7 +52,7 @@ export class CS571Initializer {
                 tokens.method(req, res),
                 tokens.url(req, res),
                 tokens.status(req, res),
-                CS571Auth.getUserFromRequest(req),
+                auth.getUserFromRequest(req).email,
                 tokens['response-time'](req, res), 'ms'
             ].join(' ')
         }));
@@ -107,12 +110,18 @@ export class CS571Initializer {
         });
     }
 
-    private static initAuth(app: Express, noAuthRoutes: string[] | undefined): void {
+    private static initAuth(app: Express, auth: CS571Auth, noAuthRoutes: string[] | undefined): CS571Auth {
         app.use(function (req, res, next) {
-            if((noAuthRoutes && noAuthRoutes.includes(req.originalUrl)) || CS571Auth.authenticate(req, res)) {
+            if((noAuthRoutes && noAuthRoutes.includes(req.originalUrl.split("?")[0])) || auth.authenticate(req)) {
                 next();
+            } else {
+                res.status(401).send({
+                    msg: "You specified an invalid X-CS571-ID!"
+                });
             }
         });
+        auth.init();
+        return auth;
     }
 
     private static initHealth(router: CS571Router): void {

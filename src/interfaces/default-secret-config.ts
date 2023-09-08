@@ -1,3 +1,3 @@
 export interface CS571DefaultSecretConfig {
-    readonly SESSION_SECRET: string;
+    readonly X_CS571_SECRET: string;
 }
