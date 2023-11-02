@@ -1,6 +1,6 @@
 {
   "name": "@cs571/f23-api-middleware",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "description": "",
   "main": "dist/index.js",
   "private": false,

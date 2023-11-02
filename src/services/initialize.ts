@@ -22,7 +22,7 @@ export class CS571Initializer {
         const config = CS571Config.construct<T, K>();
         const auth = CS571Auth.construct(config);
         
-        CS571Initializer.initLogging(app, auth);
+        CS571Initializer.initLogging(app, auth, config);
         CS571Initializer.initErrorHandling(app);
         CS571Initializer.initBodyParsing(app);
         CS571Initializer.initRateLimiting<T>(app, config.PUBLIC_CONFIG);
@@ -44,17 +44,29 @@ export class CS571Initializer {
         dotenv.config();
     }
 
-    private static initLogging(app: Express, auth: CS571Auth): void {
+    private static initLogging(app: Express, auth: CS571Auth, config: CS571Config): void {
         app.use(morgan((tokens, req, res) => {
-            return [
-                CS571Util.getDateForLogging(),
-                tokens['remote-addr'](req, res),
-                tokens.method(req, res),
-                tokens.url(req, res),
-                tokens.status(req, res),
-                auth.getUserFromRequest(req).email,
-                tokens['response-time'](req, res), 'ms'
-            ].join(' ')
+            if (config.PUBLIC_CONFIG.LOG_IPS) {
+                return [
+                    CS571Util.getDateForLogging(),
+                    tokens['remote-addr'](req, res),
+                    tokens.method(req, res),
+                    tokens.url(req, res),
+                    tokens.status(req, res),
+                    auth.getUserFromRequest(req).email,
+                    tokens['response-time'](req, res), 'ms'
+                ].join(' ')
+            } else {
+                return [
+                    CS571Util.getDateForLogging(),
+                    tokens.method(req, res),
+                    tokens.url(req, res),
+                    tokens.status(req, res),
+                    auth.getUserFromRequest(req).email,
+                    tokens['response-time'](req, res), 'ms'
+                ].join(' ')
+            }
+            
         }));
     }
 
